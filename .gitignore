@@ -1,0 +1,16 @@
+data/
+runs/
+.venv/
+*.zip
+__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+.superpowers/
+report/*.aux
+report/*.log
+report/*.out
+report/*.fdb_latexmk
+report/*.fls
+report/*.bbl
+report/*.blg
