@@ -119,19 +119,25 @@ def _decode(model: VAE, z: torch.Tensor, device: torch.device, batch_size: int =
                       for i in range(0, len(z), batch_size)])
 
 
+def load_run_model(run_dir: Path, device: torch.device) -> tuple[VAE, dict]:
+    """Rebuild the VAE from run_dir/config.json and load best.pt; returns (model in eval mode, config)."""
+    run_dir = Path(run_dir)
+    cfg = json.loads((run_dir / "config.json").read_text())
+    model = VAE(latent_dim=cfg["latent_dim"], img_size=cfg["img_size"]).to(device)
+    model.load_state_dict(torch.load(run_dir / "best.pt", weights_only=True)["model"])
+    return model.eval(), cfg
+
+
 def evaluate_run(run_dir: Path, n_samples: int = 2000, device: str | None = None,
                  inception: nn.Module | None = None, cache_path: Path | None = None,
                  gmm_components: int = 10, seed: int = 0) -> dict:
     """Score prior samples, GMM samples and test reconstructions; write run_dir/eval.json."""
     run_dir = Path(run_dir)
-    cfg = json.loads((run_dir / "config.json").read_text())
     dev = get_device(device)
     seed_everything(seed)
 
+    model, cfg = load_run_model(run_dir, dev)
     cache = load_cache(Path(cache_path or cfg["cache_path"]))
-    model = VAE(latent_dim=cfg["latent_dim"], img_size=cfg["img_size"]).to(dev)
-    model.load_state_dict(torch.load(run_dir / "best.pt", weights_only=True)["model"])
-    model.eval()
 
     inception = (inception if inception is not None else load_inception(dev)).to(dev)
     real = cache["test_x"].float() / 255.0
