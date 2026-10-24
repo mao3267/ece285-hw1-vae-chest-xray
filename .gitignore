@@ -14,3 +14,4 @@ report/*.fdb_latexmk
 report/*.fls
 report/*.bbl
 report/*.blg
+Synthetic_Chest_X-ray_Generation_*.pdf
