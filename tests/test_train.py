@@ -98,3 +98,17 @@ def test_cli_exits_nonzero_when_training_was_interrupted(tiny_cache, tmp_path, m
     with pytest.raises(SystemExit) as exc:
         train_module.main(argv)
     assert exc.value.code == 130
+
+
+@pytest.mark.parametrize("flag, expected", [([], True), (["--no-augment"], False)])
+def test_cli_augment_flag_reaches_loaders_and_config(tiny_cache, tmp_path, monkeypatch, flag, expected):
+    seen = []
+    real = train_module.make_loaders
+    monkeypatch.setattr(train_module, "make_loaders",
+                        lambda cache, bs, augment=True: (seen.append(augment), real(cache, bs, augment))[1])
+    train_module.main(["--name", "t", "--epochs", "1", "--batch-size", "32", "--cache-path", tiny_cache,
+                       "--device", "cpu", "--runs-dir", str(tmp_path / "runs"), "--warmup-epochs", "1",
+                       "--sample-every", "1", *flag])
+    assert seen == [expected]
+    cfg = json.loads((tmp_path / "runs" / "t" / "config.json").read_text())
+    assert cfg["augment"] is expected

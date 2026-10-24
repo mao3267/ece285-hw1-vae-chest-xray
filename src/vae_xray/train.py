@@ -35,6 +35,7 @@ class TrainConfig:
     device: str | None = None
     runs_dir: str = "runs"
     sample_every: int = 10
+    augment: bool = True
 
 
 def _state(model, optimizer, epoch: int, cfg: TrainConfig) -> dict:
@@ -85,7 +86,8 @@ def train(cfg: TrainConfig, force: bool = False,
     (run_dir / "config.json").write_text(
         json.dumps({**asdict(cfg), "device_used": device.type}, indent=2))
 
-    train_loader, val_loader = make_loaders(load_cache(Path(cfg.cache_path)), cfg.batch_size)
+    train_loader, val_loader = make_loaders(load_cache(Path(cfg.cache_path)), cfg.batch_size,
+                                              cfg.augment)
     model = VAE(latent_dim=cfg.latent_dim, img_size=cfg.img_size).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5)
@@ -148,6 +150,8 @@ def main(argv: list[str] | None = None) -> None:
             parser.add_argument(flag, required=True)
         elif fld.name == "device":
             parser.add_argument(flag, default=None, help="override: mps | cpu")
+        elif fld.name == "augment":
+            parser.add_argument(flag, action=argparse.BooleanOptionalAction, default=True)
         else:
             parser.add_argument(flag, type=type(getattr(defaults, fld.name)),
                                 default=getattr(defaults, fld.name))
