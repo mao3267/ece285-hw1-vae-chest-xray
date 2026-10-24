@@ -25,7 +25,7 @@ def _fake_run(root: Path, name: str, beta: float, fid: float, with_eval: bool = 
             rows.append(f"{epoch},{split},{100 / epoch:.2f},{90 / epoch:.2f},{10 / epoch:.2f},{beta},0.001")
     (run / "metrics.csv").write_text("\n".join(rows) + "\n")
     if with_eval:
-        block = lambda f: {"fid": f, "is_mean": 1.5, "is_std": 0.1}  # noqa: E731
+        block = lambda f: {"fid": f, "is_mean": 1.5, "is_std": 0.1, "fid_matched": f + 4}  # noqa: E731
         (run / "eval.json").write_text(json.dumps({
             "prior": block(fid), "gmm": block(fid - 10), "recon": block(fid - 20),
             "n_samples": 2000, "n_real": 624, "device": "cpu"}))
@@ -52,7 +52,8 @@ def test_write_results_table_contains_values_from_eval_json(tmp_path):
     write_results_table(runs, out)
     text = out.read_text()
     assert text.count("\\\\") >= 2
-    for needle in ("123.5", "113.5", "103.5", "98.8", "88.8", "78.8", "1.50", "0.10"):
+    # prior, GMM, GMM matched-N (fid_matched = fid + 4), recon, IS
+    for needle in ("123.5", "113.5", "117.5", "103.5", "98.8", "88.8", "92.8", "78.8", "1.50", "0.10"):
         assert needle in text, needle
     assert "\\begin{tabular}" in text and "\\end{tabular}" in text
 

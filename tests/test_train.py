@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 import torch
 
-from vae_xray.train import TrainConfig, train
+from vae_xray import train as train_module
+from vae_xray.train import TrainConfig, run_finished, train
 
 
 @pytest.fixture
@@ -73,3 +74,27 @@ def test_val_logged_at_target_beta_train_at_annealed_beta(tiny_cache, tmp_path):
     val_betas = [float(r["beta"]) for r in rows if r["split"] == "val"]
     assert train_betas == [0.0, 0.125]  # beta_at_epoch(0..1, 0.5, warmup 4)
     assert val_betas == [0.5, 0.5]
+
+
+def test_run_finished_is_false_for_interrupted_run_and_true_for_complete_run(tiny_cache, tmp_path):
+    def hook(epoch: int) -> None:
+        if epoch == 1:
+            raise KeyboardInterrupt
+
+    interrupted = train(_cfg(tiny_cache, tmp_path, name="cut", epochs=3), epoch_hook=hook)
+    complete = train(_cfg(tiny_cache, tmp_path, name="full", epochs=2))
+    assert run_finished(interrupted, epochs=3) is False
+    assert run_finished(complete, epochs=2) is True
+
+
+def test_cli_exits_nonzero_when_training_was_interrupted(tiny_cache, tmp_path, monkeypatch):
+    # An interrupted train() returns normally; the CLI must still fail so ./run_all.sh stops.
+    def interrupted_train(cfg, force=False, epoch_hook=None):
+        return train(cfg, force=force, epoch_hook=lambda e: (_ for _ in ()).throw(KeyboardInterrupt))
+
+    monkeypatch.setattr(train_module, "train", interrupted_train)
+    argv = ["--name", "cli", "--epochs", "3", "--batch-size", "32", "--cache-path", tiny_cache,
+            "--device", "cpu", "--runs-dir", str(tmp_path / "runs"), "--warmup-epochs", "1"]
+    with pytest.raises(SystemExit) as exc:
+        train_module.main(argv)
+    assert exc.value.code == 130

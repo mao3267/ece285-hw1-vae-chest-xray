@@ -126,7 +126,8 @@ def plot_pca(run_dir: Path, out: Path, device: str | None = None,
 
 
 def write_results_table(run_dirs: list[Path], out: Path) -> None:
-    """LaTeX tabular: one row per run with FID (prior / GMM / recon) and IS of prior samples."""
+    """LaTeX tabular, one row per run: FID of prior, GMM and GMM@624 (as many generated images as
+    real ones, so it is comparable with recon, which has 624 images) and recon, plus prior IS."""
     rows = []
     for run_dir in run_dirs:
         eval_path = Path(run_dir) / "eval.json"
@@ -135,14 +136,14 @@ def write_results_table(run_dirs: list[Path], out: Path) -> None:
         e = json.loads(eval_path.read_text())
         rows.append(
             f"{_beta(run_dir):g} & {e['prior']['fid']:.1f} & {e['gmm']['fid']:.1f} & "
-            f"{e['recon']['fid']:.1f} & {e['prior']['is_mean']:.2f} $\\pm$ "
+            f"{e['gmm']['fid_matched']:.1f} & {e['recon']['fid']:.1f} & "
+            f"{e['prior']['is_mean']:.2f} $\\pm$ "
             f"{e['prior']['is_std']:.2f} \\\\"
         )
     lines = [
-        "\\begin{tabular}{lcccc}",
+        "\\begin{tabular}{lccccc}",
         "\\toprule",
-        "$\\beta$ & FID prior $\\downarrow$ & FID GMM $\\downarrow$ & FID recon. $\\downarrow$ "
-        "& IS prior $\\uparrow$ \\\\",
+        "$\\beta$ & FID prior & FID GMM & FID GMM@624 & FID recon. & IS prior \\\\",
         "\\midrule",
         *rows,
         "\\bottomrule",

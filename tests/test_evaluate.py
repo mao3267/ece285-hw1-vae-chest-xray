@@ -120,6 +120,9 @@ def test_evaluate_run_writes_eval_json(tmp_path: Path):
     saved = json.loads((run_dir / "eval.json").read_text())
     assert saved == result
     for key in ("prior", "gmm", "recon"):
-        assert set(saved[key]) == {"fid", "is_mean", "is_std"}
+        assert set(saved[key]) == {"fid", "is_mean", "is_std", "fid_matched"}
         assert np.isfinite(saved[key]["fid"])
+        assert np.isfinite(saved[key]["fid_matched"])  # FID with n_real generated images
+    # reconstructions already have n_real images, so matched and full FID coincide
+    assert saved["recon"]["fid_matched"] == saved["recon"]["fid"]
     assert saved["n_samples"] == 30 and saved["n_real"] == 24 and saved["device"] == "cpu"

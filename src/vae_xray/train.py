@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import shutil
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, fields
@@ -128,7 +129,17 @@ def train(cfg: TrainConfig, force: bool = False,
     return run_dir
 
 
-def main() -> None:
+def run_finished(run_dir: Path, epochs: int) -> bool:
+    """True if metrics.csv in `run_dir` reaches epoch `epochs` (the run was not cut short)."""
+    metrics = Path(run_dir) / "metrics.csv"
+    if not metrics.exists():
+        return False
+    with open(metrics) as f:
+        done = [int(row["epoch"]) for row in csv.DictReader(f)]
+    return bool(done) and max(done) >= epochs
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     defaults = TrainConfig(name="")
     for fld in fields(TrainConfig):
@@ -141,9 +152,12 @@ def main() -> None:
             parser.add_argument(flag, type=type(getattr(defaults, fld.name)),
                                 default=getattr(defaults, fld.name))
     parser.add_argument("--force", action="store_true", help="overwrite an existing run")
-    args = vars(parser.parse_args())
+    args = vars(parser.parse_args(argv))
     force = args.pop("force")
-    train(TrainConfig(**args), force=force)
+    cfg = TrainConfig(**args)
+    run_dir = train(cfg, force=force)
+    if not run_finished(run_dir, cfg.epochs):
+        sys.exit(130)  # interrupted: fail so ./run_all.sh stops instead of evaluating a partial run
 
 
 if __name__ == "__main__":

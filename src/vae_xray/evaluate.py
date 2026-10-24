@@ -154,6 +154,9 @@ def evaluate_run(run_dir: Path, n_samples: int = 2000, device: str | None = None
     for name, imgs in sources.items():
         feats, logits = inception_outputs(imgs, dev, model=inception)
         result[name] = scores_from_outputs(real_feats, feats, logits)
+        # FID depends on the sample count (biased up for small N); also report it with exactly
+        # as many generated images as real ones so all three sources can be compared fairly.
+        result[name]["fid_matched"] = _fid(real_feats, feats[:len(real_feats)])
     result.update(n_samples=n_samples, n_real=len(real), device=dev.type)
     (run_dir / "eval.json").write_text(json.dumps(result, indent=2))
     return result

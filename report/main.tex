@@ -42,10 +42,10 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \section{Setup}
 \textbf{Data.} The 5{,}216 training images are split 90/10 (seeded) into 4{,}694 train and 522 validation images; the 624 test images are the FID reference. Images are grayscale, resized and center-cropped to $64{\times}64$, scaled to $[0,1]$; training augmentation is rotation ($\pm5^\circ$) and translation (5\%), without flips (they would mirror the anatomy).
 
-\textbf{Training and evaluation.} Adam, lr $10^{-3}$ (halved on validation plateaus), batch 128, 100 epochs, seed 0, on an Apple M1 Pro GPU ($\approx$8\,s/epoch); the lowest-validation-loss checkpoint is evaluated. FID and IS use 2{,}000 generated images, PyTorch-Ignite\footnote{\url{https://github.com/pytorch/ignite}}, and ImageNet InceptionV3~\cite{szegedy2016inception} features (grayscale replicated to 3 channels, resized to $299{\times}299$); IS is the mean$\pm$std over 10 splits. ``Recon.'' is the FID of test-set reconstructions, the best a model could reach.
+\textbf{Training and evaluation.} Adam, lr $10^{-3}$ (halved on validation plateaus), batch 128, 100 epochs, seed 0, on an Apple M1 Pro GPU ($\approx$8\,s/epoch); the lowest-validation-loss checkpoint is evaluated. FID and IS use 2{,}000 generated images, PyTorch-Ignite\footnote{\url{https://github.com/pytorch/ignite}}, and ImageNet InceptionV3~\cite{szegedy2016inception} features (grayscale replicated to 3 channels, resized to $299{\times}299$); IS is the mean$\pm$std over 10 splits. ``Recon.'' is the FID of the 624 test-set reconstructions, a reference point. FID is biased upward for small sample sizes, so ``GMM@624'' scores only 624 GMM samples, to compare like with like against Recon.
 
 \begin{table}[tb]
-  \caption{FID (lower is better) against the 624 test images, and Inception Score of prior samples (higher is better).}
+  \caption{FID (lower is better) against the 624 test images. Prior and GMM use 2{,}000 generated images; GMM@624 and Recon.\ use 624. Inception Score (higher is better) is for prior samples.}
   \label{tab:results}
   \centering\small
   \input{results_table.tex}
@@ -59,9 +59,9 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \end{figure}
 
 \section{Results}
-\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}). Smaller $\beta$ lowers validation BCE (2567, 2546, 2539 for $\beta=1,0.1,0.01$) but raises KL (31, 99, 289 nats): the codes carry more information but drift from the prior. 
+\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}). Smaller $\beta$ lowers validation BCE (2567, 2546, 2539 for $\beta=1,0.1,0.01$) but raises KL (31, 99, 289 nats): codes carry more information but drift from the prior. 
 
-\textbf{Quantitative.} Table~\ref{tab:results} shows the trade-off. Reconstruction FID improves as $\beta$ falls (252, 227, 206) while prior-sample FID worsens (300, 312, 323). GMM sampling reverses this: its FID (248, 232, 214) is close to the reconstruction FID, so the generation gap is mostly prior mismatch, not decoder quality. IS stays at 1.4--1.5 (ImageNet classes separate these images poorly), so we treat it as uninformative. Absolute FIDs are high (blurry $64{\times}64$ images; only 624 real images, which biases FID upward), so they are not comparable to FIDs on other datasets.
+\textbf{Quantitative.} Table~\ref{tab:results} shows the trade-off. Reconstruction FID improves as $\beta$ falls (252, 227, 206) while prior-sample FID worsens (300, 312, 323). GMM sampling reverses this (248, 232, 214 with 2{,}000 samples). With matched size, Recon.\ $<$ GMM@624 $<$ prior holds for every $\beta$ (GMM@624: 257, 234, 218), so GMM sampling closes most, not all, of the gap between prior samples and reconstructions: the gap is mostly prior mismatch, not decoder quality. IS of prior samples is 1.36--1.47; ImageNet classes separate these images poorly, so we treat IS as uninformative. Absolute FIDs are high (blurry images, 624 real images) and not comparable to other datasets.
 
 \textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) are noisy textures with dark borders (likely the rotation augmentation's corner fill), while GMM samples (middle) show plausible rib cages and lung fields, matching the FID gap. Reconstructions keep global shape but lose rib detail. A PCA of the test latents separates NORMAL and PNEUMONIA only partly (heavy overlap), so we do not claim a clean disease separation. Limitations: blurry output, one seed per setting, untuned GMM size, no clinical or downstream validation.
 
@@ -82,7 +82,7 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \end{figure}
 
 \section*{AI usage statement}
-Claude Code (Anthropic; Claude Opus 5.5 and Claude Sonnet 5.5) wrote the code and tests, ran training and evaluation on the author's laptop, searched for and summarized related work and checked the references, and drafted this report. The author chose the setup, approved the design and plan, and approved each download. % TODO: edit to state exactly what you did (reviewing results, editing text, running experiments) and check it against the course's AI policy.
+Claude Code (Anthropic; Claude Opus 5.5 and Claude Sonnet 5.5) wrote the code and tests, ran training and evaluation on the author's laptop, searched for and summarized related work and checked the references, and drafted this report. A separate Claude Fable 5.1 review of the code and report led to two fixes (interrupt handling; the FID sample-size comparison). The author chose the setup, approved the design and plan, and approved each download. % TODO: edit to state exactly what you did (reviewing results, editing text, running experiments) and check it against the course's AI policy.
 
 {\footnotesize
 \setlength{\bibsep}{1pt}
