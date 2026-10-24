@@ -1,0 +1,93 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2025}  % TODO: switch to [final] if the course wants author names without the preprint footer
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{microtype}
+
+\title{Convolutional VAEs for Chest X-ray Generation}
+
+\author{%
+  TODO: your name \quad (\texttt{TODO@ucsd.edu}) \\
+  ECE 285 Homework 1, UC San Diego
+}
+
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+
+\begin{document}
+
+\maketitle
+\vspace{-1.2em}
+
+\begin{abstract}
+We train convolutional VAEs on pediatric chest X-rays and score samples with FID and Inception Score. A sweep over the KL weight $\beta\in\{1,0.1,0.01\}$ shows a trade-off: small $\beta$ reconstructs better (FID 206 vs.\ 252) but samples worse from the $\mathcal{N}(0,I)$ prior (323 vs.\ 300). Sampling from a Gaussian mixture fitted to the training latents removes most of the gap; the best model reaches FID 214.
+\end{abstract}
+
+\section{Introduction}
+We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-Ray Images (Pneumonia) dataset~\cite{kermany2018}. The closest prior work we found~\cite{chandra2025cenim} trains a similar $64{\times}64$ VAE on this data with a very small KL weight ($\beta{=}0.005$) and judges samples by eye. We add FID~\cite{heusel2017fid} and Inception Score~\cite{salimans2016is}, and measure how $\beta$ and the sampling distribution change them.
+
+\section{Method}
+\textbf{Model.} Encoder: four stride-2 $4{\times}4$ convolutions (64, 128, 256, 512 channels) with BatchNorm and LeakyReLU(0.2), then two linear heads for the mean and log-variance (clamped to $[-10,10]$) of a 128-d Gaussian posterior. The decoder mirrors it with transposed convolutions and a sigmoid output (8.7M parameters).
+
+\textbf{Loss and sampling.} $\mathrm{BCE}(x,\hat x)+\beta\,D_{\mathrm{KL}}(q(z|x)\,\|\,\mathcal{N}(0,I))$, BCE summed over pixels; $\beta$ grows linearly from 0 over the first 10 epochs to avoid posterior collapse. ``Prior'' samples decode $z\sim\mathcal{N}(0,I)$. Since small $\beta$ leaves the aggregate posterior far from $\mathcal{N}(0,I)$, ``GMM'' samples instead decode $z$ from a 10-component Gaussian mixture fitted to the training latent means~\cite{ghosh2019rae}.
+
+\section{Setup}
+\textbf{Data.} The 5{,}216 training images are split 90/10 (seeded) into 4{,}694 train and 522 validation images; the 624 test images are the FID reference. Images are grayscale, resized and center-cropped to $64{\times}64$, scaled to $[0,1]$; training augmentation is rotation ($\pm5^\circ$) and translation (5\%), without flips (they would mirror the anatomy).
+
+\textbf{Training and evaluation.} Adam, lr $10^{-3}$ (halved on validation plateaus), batch 128, 100 epochs, seed 0, on an Apple M1 Pro GPU ($\approx$8\,s/epoch); the lowest-validation-loss checkpoint is evaluated. FID and IS use 2{,}000 generated images, PyTorch-Ignite\footnote{\url{https://github.com/pytorch/ignite}}, and ImageNet InceptionV3~\cite{szegedy2016inception} features (grayscale replicated to 3 channels, resized to $299{\times}299$); IS is the mean$\pm$std over 10 splits. ``Recon.'' is the FID of test-set reconstructions, the best a model could reach.
+
+\begin{table}[tb]
+  \caption{FID (lower is better) against the 624 test images, and Inception Score of prior samples (higher is better).}
+  \label{tab:results}
+  \centering\small
+  \input{results_table.tex}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/losses.pdf}
+  \caption{Training (solid) and validation (dashed) losses; epochs 1--4 are omitted because the KL warm-up makes them orders of magnitude larger.}
+  \label{fig:losses}
+\end{figure}
+
+\section{Results}
+\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}). Smaller $\beta$ lowers validation BCE (2567, 2546, 2539 for $\beta=1,0.1,0.01$) but raises KL (31, 99, 289 nats): the codes carry more information but drift from the prior. 
+
+\textbf{Quantitative.} Table~\ref{tab:results} shows the trade-off. Reconstruction FID improves as $\beta$ falls (252, 227, 206) while prior-sample FID worsens (300, 312, 323). GMM sampling reverses this: its FID (248, 232, 214) is close to the reconstruction FID, so the generation gap is mostly prior mismatch, not decoder quality. IS stays at 1.4--1.5 (ImageNet classes separate these images poorly), so we treat it as uninformative. Absolute FIDs are high (blurry $64{\times}64$ images; only 624 real images, which biases FID upward), so they are not comparable to FIDs on other datasets.
+
+\textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) are noisy textures with dark borders (likely the rotation augmentation's corner fill), while GMM samples (middle) show plausible rib cages and lung fields, matching the FID gap. Reconstructions keep global shape but lose rib detail. A PCA of the test latents separates NORMAL and PNEUMONIA only partly (heavy overlap), so we do not claim a clean disease separation. Limitations: blurry output, one seed per setting, untuned GMM size, no clinical or downstream validation.
+
+\begin{figure}[tb]
+  \centering
+  \begin{minipage}[c]{0.25\linewidth}\centering
+    \includegraphics[width=\linewidth]{figures/samples_prior.png}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.25\linewidth}\centering
+    \includegraphics[width=\linewidth]{figures/samples_gmm.png}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.40\linewidth}\centering
+    \includegraphics[width=\linewidth]{figures/recon.png}\\[3pt]
+    \includegraphics[width=\linewidth]{figures/interp.png}
+  \end{minipage}
+  \caption{$\beta{=}0.01$ model. Left: prior samples. Middle: GMM samples. Right: test images over their reconstructions (top); latent interpolation from a normal to a pneumonia image (bottom).}
+  \label{fig:samples}
+\end{figure}
+
+\section*{AI usage statement}
+Claude Code (Anthropic; Claude Opus 5.5 and Claude Sonnet 5.5) wrote the code and tests, ran training and evaluation on the author's laptop, searched for and summarized related work and checked the references, and drafted this report. The author chose the setup, approved the design and plan, and approved each download. % TODO: edit to state exactly what you did (reviewing results, editing text, running experiments) and check it against the course's AI policy.
+
+{\footnotesize
+\setlength{\bibsep}{1pt}
+\bibliographystyle{plainnat}
+\bibliography{references}
+}
+
+\end{document}

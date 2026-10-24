@@ -45,7 +45,7 @@ def plot_losses(run_dirs: list[Path], out: Path, min_epoch: int = 5) -> None:
     """
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(1, 3, figsize=(10, 2.8))
+    fig, axes = plt.subplots(1, 3, figsize=(6.5, 1.45))  # near the printed width: fonts stay readable
     for color, run_dir in zip(plt.get_cmap("tab10").colors, run_dirs):
         df = pd.read_csv(Path(run_dir) / "metrics.csv")
         df = df[df.epoch >= min_epoch]
@@ -56,11 +56,11 @@ def plot_losses(run_dirs: list[Path], out: Path, min_epoch: int = 5) -> None:
                 ax.plot(d.epoch, d[col], style, color=color, lw=1.2,
                         label=f"{label} {split}" if col == "total" else None)
     for ax, title in zip(axes, ("Total loss", "Reconstruction (BCE)", "KL divergence")):
-        ax.set_title(title, fontsize=9)
-        ax.set_xlabel("epoch", fontsize=8)
-        ax.tick_params(labelsize=7)
+        ax.set_title(title, fontsize=7)
+        ax.set_xlabel("epoch", fontsize=6.5)
+        ax.tick_params(labelsize=6)
         ax.grid(alpha=0.3)
-    axes[0].legend(fontsize=6, ncol=2)
+    axes[0].legend(fontsize=4.5, ncol=2, handlelength=1.5, columnspacing=0.8)
     fig.tight_layout()
     fig.savefig(out)
     plt.close(fig)
