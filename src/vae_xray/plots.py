@@ -37,13 +37,18 @@ def _setup(run_dir: Path, device: str | None, cache_path: Path | None):
     return dev, model, cfg, cache
 
 
-def plot_losses(run_dirs: list[Path], out: Path) -> None:
-    """Total / reconstruction / KL per epoch; one color per run, train solid, val dashed."""
+def plot_losses(run_dirs: list[Path], out: Path, min_epoch: int = 5) -> None:
+    """Total / reconstruction / KL per epoch; one color per run, train solid, val dashed.
+
+    Epochs before `min_epoch` are left out: the KL warm-up makes the first epochs' values
+    orders of magnitude larger and would flatten everything after them.
+    """
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 3, figsize=(10, 2.8))
     for color, run_dir in zip(plt.get_cmap("tab10").colors, run_dirs):
         df = pd.read_csv(Path(run_dir) / "metrics.csv")
+        df = df[df.epoch >= min_epoch]
         label = rf"$\beta$={_beta(run_dir):g}"
         for ax, col in zip(axes, ("total", "recon", "kl")):
             for split, style in (("train", "-"), ("val", "--")):
@@ -55,9 +60,7 @@ def plot_losses(run_dirs: list[Path], out: Path) -> None:
         ax.set_xlabel("epoch", fontsize=8)
         ax.tick_params(labelsize=7)
         ax.grid(alpha=0.3)
-    axes[0].set_yscale("log")
-    axes[1].set_yscale("log")
-    axes[0].legend(fontsize=6)
+    axes[0].legend(fontsize=6, ncol=2)
     fig.tight_layout()
     fig.savefig(out)
     plt.close(fig)
