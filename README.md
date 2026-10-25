@@ -29,14 +29,20 @@ This extracts only `chest_xray/{train,test}` into `data/` and writes `data/cache
 ## Run
 
 ```bash
-./run_all.sh                 # trains beta = 1, 0.1, 0.01 and evaluates each (skips finished runs)
+./run_all.sh                 # trains beta = 1, 0.1, 0.01 without augmentation (runs/beta*_noaug) and evaluates each
 ./run_all.sh train           # training only
 ./run_all.sh eval            # evaluation only
 
-# a single run
-uv run python -m vae_xray.train --name beta1 --beta 1.0
-uv run python -m vae_xray.evaluate --run beta1
+# a single run (training augmentation is on by default; the report's sweep uses --no-augment)
+uv run python -m vae_xray.train --name beta1_noaug --beta 1.0 --no-augment
+uv run python -m vae_xray.evaluate --run beta1_noaug
+
+# the augmentation ablation reported in the paper
+uv run python -m vae_xray.train --name beta0.01 --beta 0.01
+uv run python -m vae_xray.evaluate --run beta0.01
 ```
+
+Finished runs are skipped, so `./run_all.sh` is safe to re-run after an interruption.
 
 Each run writes `runs/<name>/` with `config.json`, `metrics.csv`, `best.pt`, `last.pt`,
 sample grids, and (after evaluation) `eval.json`. Evaluation downloads the ImageNet
