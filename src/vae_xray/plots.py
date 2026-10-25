@@ -1,4 +1,7 @@
-"""Report figures and the results table: `python -m vae_xray.plots --runs beta1 beta0.1 --best beta1`."""
+"""Report figures and the results table.
+
+Usage: `python -m vae_xray.plots --runs beta1_noaug beta0.1_noaug --best beta0.1_noaug`.
+"""
 
 import argparse
 import json

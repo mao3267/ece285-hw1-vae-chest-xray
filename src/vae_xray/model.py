@@ -1,5 +1,7 @@
 """Convolutional VAE, its loss, and the KL-weight schedule."""
 
+from itertools import pairwise
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -34,14 +36,14 @@ class VAE(nn.Module):
         flat = self.feat_ch * self.feat_size**2
 
         chans = (1, *widths)
-        self.encoder = nn.Sequential(*[_enc_block(a, b) for a, b in zip(chans[:-1], chans[1:])])
+        self.encoder = nn.Sequential(*[_enc_block(a, b) for a, b in pairwise(chans)])
         self.fc_mu = nn.Linear(flat, latent_dim)
         self.fc_logvar = nn.Linear(flat, latent_dim)
 
         rev = widths[::-1]
         self.fc_dec = nn.Linear(latent_dim, flat)
         self.decoder = nn.Sequential(
-            *[_dec_block(a, b) for a, b in zip(rev[:-1], rev[1:])],
+            *[_dec_block(a, b) for a, b in pairwise(rev)],
             nn.ConvTranspose2d(rev[-1], 1, kernel_size=4, stride=2, padding=1),
             nn.Sigmoid(),
         )

@@ -1,21 +1,24 @@
-"""Evaluate a trained VAE with FID and Inception Score: `python -m vae_xray.evaluate --run beta1`."""
+"""Evaluate a trained VAE with FID and Inception Score: `python -m vae_xray.evaluate --run beta1_noaug`."""
 
 import argparse
 import json
 import os
 from pathlib import Path
 
-import numpy as np
-import torch
-import torch.nn.functional as F
-from ignite.metrics import InceptionScore
-from ignite.metrics.gan.fid import fid_score
-from sklearn.mixture import GaussianMixture
-from torch import nn
+# Let any op missing on MPS fall back to CPU instead of crashing (must be set before torch loads).
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
-from vae_xray.common import get_device, seed_everything
-from vae_xray.data import load_cache
-from vae_xray.model import VAE
+import numpy as np  # noqa: E402
+import torch  # noqa: E402
+import torch.nn.functional as F  # noqa: E402
+from ignite.metrics import InceptionScore  # noqa: E402
+from ignite.metrics.gan.fid import fid_score  # noqa: E402
+from sklearn.mixture import GaussianMixture  # noqa: E402
+from torch import nn  # noqa: E402
+
+from vae_xray.common import get_device, seed_everything  # noqa: E402
+from vae_xray.data import load_cache  # noqa: E402
+from vae_xray.model import VAE  # noqa: E402
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -59,9 +62,9 @@ def inception_outputs(x: torch.Tensor, device: torch.device, batch_size: int = 6
     model = (model if model is not None else load_inception(device)).to(device)
     feats, logits = [], []
     for i in range(0, len(x), batch_size):
-        f, l = model(to_inception_input(x[i:i + batch_size].to(device)))
+        f, lg = model(to_inception_input(x[i:i + batch_size].to(device)))
         feats.append(f.cpu())
-        logits.append(l.cpu())
+        logits.append(lg.cpu())
     return torch.cat(feats), torch.cat(logits)
 
 
@@ -163,8 +166,6 @@ def evaluate_run(run_dir: Path, n_samples: int = 2000, device: str | None = None
 
 
 def main() -> None:
-    # Let any op missing on MPS fall back to CPU instead of crashing.
-    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True, help="run name under --runs-dir")
     parser.add_argument("--runs-dir", default="runs")
