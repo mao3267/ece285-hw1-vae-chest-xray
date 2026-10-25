@@ -1,6 +1,7 @@
 \documentclass{article}
 
-\usepackage[preprint]{neurips_2025}  % TODO: switch to [final] if the course wants author names without the preprint footer
+\usepackage[main,final]{neurips_2025}
+\makeatletter\renewcommand{\@noticestring}{}\makeatother  % drop the conference footnote: this is a course report
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -14,7 +15,7 @@
 \title{Convolutional VAEs for Chest X-ray Generation}
 
 \author{%
-  TODO: your name \quad (\texttt{TODO@ucsd.edu}) \\
+  Vincent Chen \\
   ECE 285 Homework 1, UC San Diego
 }
 
@@ -28,7 +29,7 @@
 \vspace{-1.2em}
 
 \begin{abstract}
-We train convolutional VAEs on pediatric chest X-rays and score samples with FID and Inception Score. A sweep over the KL weight $\beta\in\{1,0.1,0.01\}$ shows a trade-off: small $\beta$ reconstructs better (FID 206 vs.\ 252) but samples worse from the $\mathcal{N}(0,I)$ prior (323 vs.\ 300). Sampling from a Gaussian mixture fitted to the training latents removes most of the gap; the best model reaches FID 214.
+We train convolutional VAEs on pediatric chest X-rays and score samples with FID and Inception Score. A sweep over the KL weight $\beta\in\{1,0.1,0.01\}$ shows that reconstructions improve as $\beta$ falls (FID 221 to 134), while prior samples improve only at $\beta{=}0.01$ (219, 220, 185). Sampling from a Gaussian mixture fitted to the training latents helps once $\beta$ is small and closes about half of the gap to reconstructions; the best model ($\beta{=}0.01$, mixture sampling) reaches FID 158. An ablation shows that rotation/translation augmentation hurts (FID 214), which we attribute to dark corner artifacts from the black fill of rotated images.
 \end{abstract}
 
 \section{Introduction}
@@ -40,7 +41,7 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \textbf{Loss and sampling.} $\mathrm{BCE}(x,\hat x)+\beta\,D_{\mathrm{KL}}(q(z|x)\,\|\,\mathcal{N}(0,I))$, BCE summed over pixels; $\beta$ grows linearly from 0 over the first 10 epochs to avoid posterior collapse. ``Prior'' samples decode $z\sim\mathcal{N}(0,I)$. Since small $\beta$ leaves the aggregate posterior far from $\mathcal{N}(0,I)$, ``GMM'' samples instead decode $z$ from a 10-component Gaussian mixture fitted to the training latent means~\cite{ghosh2019rae}.
 
 \section{Setup}
-\textbf{Data.} The 5{,}216 training images are split 90/10 (seeded) into 4{,}694 train and 522 validation images; the 624 test images are the FID reference. Images are grayscale, resized and center-cropped to $64{\times}64$, scaled to $[0,1]$; training augmentation is rotation ($\pm5^\circ$) and translation (5\%), without flips (they would mirror the anatomy).
+\textbf{Data.} The 5{,}216 training images are split 90/10 (seeded) into 4{,}694 train and 522 validation images; the 624 test images are the FID reference. Images are grayscale, resized and center-cropped to $64{\times}64$, scaled to $[0,1]$; no augmentation is used (ablation below).
 
 \textbf{Training and evaluation.} Adam, lr $10^{-3}$ (halved on validation plateaus), batch 128, 100 epochs, seed 0, on an Apple M1 Pro GPU ($\approx$8\,s/epoch); the lowest-validation-loss checkpoint is evaluated. FID and IS use 2{,}000 generated images, PyTorch-Ignite\footnote{\url{https://github.com/pytorch/ignite}}, and ImageNet InceptionV3~\cite{szegedy2016inception} features (grayscale replicated to 3 channels, resized to $299{\times}299$); IS is the mean$\pm$std over 10 splits. ``Recon.'' is the FID of the 624 test-set reconstructions, a reference point. FID is biased upward for small sample sizes, so ``GMM@624'' scores only 624 GMM samples, to compare like with like against Recon.
 
@@ -54,16 +55,16 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/losses.pdf}
-  \caption{Training (solid) and validation (dashed) losses; epochs 1--4 are omitted because the KL warm-up makes them orders of magnitude larger.}
+  \caption{Training (solid) and validation (dashed) losses; epochs 1--4 (KL warm-up) omitted.}
   \label{fig:losses}
 \end{figure}
 
 \section{Results}
-\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}). Smaller $\beta$ lowers validation BCE (2567, 2546, 2539 for $\beta=1,0.1,0.01$) but raises KL (31, 99, 289 nats): codes carry more information but drift from the prior. 
+\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}); smaller $\beta$ lowers validation BCE (2562, 2545, 2539 for $\beta=1,0.1,0.01$) but raises KL (18, 72, 263 nats). 
 
-\textbf{Quantitative.} Table~\ref{tab:results} shows the trade-off. Reconstruction FID improves as $\beta$ falls (252, 227, 206) while prior-sample FID worsens (300, 312, 323). GMM sampling reverses this (248, 232, 214 with 2{,}000 samples). With matched size, Recon.\ $<$ GMM@624 $<$ prior holds for every $\beta$ (GMM@624: 257, 234, 218), so GMM sampling closes most, not all, of the gap between prior samples and reconstructions: the gap is mostly prior mismatch, not decoder quality. IS of prior samples is 1.36--1.47; ImageNet classes separate these images poorly, so we treat IS as uninformative. Absolute FIDs are high (blurry images, 624 real images) and not comparable to other datasets.
+\textbf{Quantitative.} Table~\ref{tab:results}: reconstruction FID improves as $\beta$ falls (221, 201, 134), while prior-sample FID is flat from $\beta{=}1$ to $0.1$ (219, 220) and improves only at $\beta{=}0.01$ (185). GMM sampling helps only when $\beta$ is small: at $\beta{=}1$ the posterior is already close to $\mathcal{N}(0,I)$ (KL 18 nats), so GMM$\approx$prior, whereas at $\beta{=}0.01$ it cuts FID from 185 to 158, about half of the 50-point gap to reconstructions (134). At matched size (GMM@624: 218, 203, 159), GMM samples are on par with reconstructions at $\beta{=}1$ and $0.1$ (all about 200--220) and behind them only at $\beta{=}0.01$ (159 vs.\ 134). IS of prior samples (1.91, 1.84, 1.70) falls as FID improves, so we treat it as uninformative. \textbf{Augmentation ablation} ($\beta{=}0.01$, rotation $\pm5^\circ$, translation 5\%): FID prior/GMM/recon.\ rises from 185/158/134 to 323/214/206 although validation loss is equal (2542), which alone would not reveal it.
 
-\textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) are noisy textures with dark borders (likely the rotation augmentation's corner fill), while GMM samples (middle) show plausible rib cages and lung fields, matching the FID gap. Reconstructions keep global shape but lose rib detail. A PCA of the test latents separates NORMAL and PNEUMONIA only partly (heavy overlap), so we do not claim a clean disease separation. Limitations: blurry output, one seed per setting, untuned GMM size, no clinical or downstream validation.
+\textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) show chest outlines but are noisier than GMM samples (middle), which have clearer rib cages and lung fields. With augmentation, prior samples had dark borders (mean brightness of the outer 4 pixels: 0.34 vs.\ 0.54 for test images; 0.52 without augmentation), consistent with the black fill of rotated training images; its training loss was also 118 nats below validation (2 without). Reconstructions lose rib detail; a PCA of test latents shows heavy NORMAL/PNEUMONIA overlap. Limitations: blurry output, one seed, untuned GMM size, no downstream validation.
 
 \begin{figure}[tb]
   \centering
@@ -82,7 +83,7 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 \end{figure}
 
 \section*{AI usage statement}
-Claude Code (Anthropic; Claude Opus 5.5 and Claude Sonnet 5.5) wrote the code and tests, ran training and evaluation on the author's laptop, searched for and summarized related work and checked the references, and drafted this report. A separate Claude Fable 5.1 review of the code and report led to two fixes (interrupt handling; the FID sample-size comparison). The author chose the setup, approved the design and plan, and approved each download. % TODO: edit to state exactly what you did (reviewing results, editing text, running experiments) and check it against the course's AI policy.
+Claude Code (Anthropic) wrote the code and tests, ran training and evaluation on the author's laptop, checked the references, and drafted this report; a separate Claude review of the code and report led to two fixes. The author found the related paper, chose the setup, approved the design, plan and downloads, and reviewed the results. % TODO: edit to state exactly what you did and check it against the course's AI policy.
 
 {\footnotesize
 \setlength{\bibsep}{1pt}
