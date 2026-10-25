@@ -3,7 +3,7 @@
 Trains convolutional VAEs on the Kaggle
 [Chest X-Ray Images (Pneumonia)](https://www.kaggle.com/paultimothymooney/chest-xray-pneumonia)
 dataset, then scores generated images with FID and Inception Score (PyTorch-Ignite).
-Design: `docs/2026-10-23-vae-chest-xray-design.md`. Report: `report/main.pdf`.
+Report: `report/main.pdf`.
 
 ## Setup
 
@@ -70,5 +70,4 @@ uv run pytest -q
 src/vae_xray/   common.py (device, seed)  data.py  model.py  train.py  evaluate.py  plots.py
 tests/          unit and smoke tests (FID/IS tests use an offline stand-in for InceptionV3)
 report/         main.tex, references.bib, neurips_2025.sty, figures/, main.pdf
-docs/           design and implementation plan
 ```
