@@ -22,6 +22,7 @@
 \setlength{\abovecaptionskip}{3pt}
 \setlength{\belowcaptionskip}{0pt}
 \setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
 
 \begin{document}
 
@@ -54,27 +55,20 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/losses.pdf}
+  \includegraphics[width=0.94\linewidth]{figures/losses.pdf}
   \caption{Training (solid) and validation (dashed) losses; epochs 1--4 (KL warm-up) omitted.}
   \label{fig:losses}
 \end{figure}
 
-\section{Results}
-\textbf{Training.} All runs converge smoothly (Fig.~\ref{fig:losses}); smaller $\beta$ lowers validation BCE (2562, 2545, 2539 for $\beta=1,0.1,0.01$) but raises KL (18, 72, 263 nats). 
-
-\textbf{Quantitative.} In Table~\ref{tab:results}, reconstruction FID improves as $\beta$ falls (221, 201, 134); prior FID is flat (219, 220) until $\beta{=}0.01$ (185). GMM sampling helps only for $\beta\le0.1$ (220$\to$207, 185$\to$158): at $\beta{=}1$ the aggregate posterior is already close to $\mathcal{N}(0,I)$ (KL 18 nats), so GMM$\approx$prior. At $\beta{=}0.01$ it closes about half of the 50-point gap to reconstructions (134). At matched size (GMM@624: 218, 203, 159), GMM matches reconstructions at $\beta{=}1$ and $0.1$ and trails only at $\beta{=}0.01$ (159 vs.\ 134). IS of prior samples falls (1.91, 1.84, 1.70) even as FID holds or improves; since ImageNet classes separate these images poorly, we treat it as uninformative. \textbf{Augmentation ablation} ($\beta{=}0.01$, rotation $\pm5^\circ$, translation 5\%): FID prior/GMM/recon.\ rises from 185/158/134 to 323/214/206 although validation loss (BCE${}+\beta$KL) is equal (2542), which alone would not reveal the degradation.
-
-\textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) show chest outlines but are noisier than GMM samples (middle), which have clearer rib cages and lung fields. With augmentation, prior samples had dark borders (mean brightness of the outer 4 pixels: 0.34 vs.\ 0.54 for test images; 0.52 without augmentation), consistent with the black fill of rotated training images; the augmented model's training loss was also 118 nats below validation (2 without). Reconstructions lose rib detail; a PCA of test latents shows heavy NORMAL/PNEUMONIA overlap. Limitations: blurry output, one seed, untuned GMM size, no downstream validation.
-
-\begin{figure}[tb]
+\begin{figure}[!b]
   \centering
-  \begin{minipage}[c]{0.25\linewidth}\centering
+  \begin{minipage}[c]{0.2\linewidth}\centering
     \includegraphics[width=\linewidth]{figures/samples_prior.png}
   \end{minipage}\hfill
-  \begin{minipage}[c]{0.25\linewidth}\centering
+  \begin{minipage}[c]{0.2\linewidth}\centering
     \includegraphics[width=\linewidth]{figures/samples_gmm.png}
   \end{minipage}\hfill
-  \begin{minipage}[c]{0.40\linewidth}\centering
+  \begin{minipage}[c]{0.33\linewidth}\centering
     \includegraphics[width=\linewidth]{figures/recon.png}\\[3pt]
     \includegraphics[width=\linewidth]{figures/interp.png}
   \end{minipage}
@@ -82,6 +76,19 @@ We implement a VAE~\cite{kingma2014vae} in PyTorch and train it on the Chest X-R
   \label{fig:samples}
 \end{figure}
 
+\section{Results}
+\textbf{Training.} All runs converge smoothly without overfitting (Fig.~\ref{fig:losses}; train and validation within 5 nats). Smaller $\beta$ lowers validation BCE (2562, 2545, 2539 for $\beta=1,0.1,0.01$) but raises KL (18, 72, 263 nats): codes keep more information and spread further from the prior.
+
+\textbf{Effect of $\beta$.} Reconstruction FID improves steadily as $\beta$ falls (221, 201, 134; Table~\ref{tab:results}). Prior-sample FID is flat from $\beta{=}1$ to $0.1$ (219, 220) and improves only at $\beta{=}0.01$ (185). Presumably a more detailed decoder is offset by codes drifting from $\mathcal{N}(0,I)$, so prior samples land where the decoder was not trained.
+
+\textbf{Effect of the sampling distribution.} GMM sampling helps only for $\beta\le0.1$ (220$\to$207, 185$\to$158). At $\beta{=}1$ the aggregate posterior is already close to $\mathcal{N}(0,I)$ (mean KL 18 nats), so GMM$\approx$prior. At $\beta{=}0.01$ it closes about half of the 50-point gap between prior samples and reconstructions (134). At matched size (GMM@624: 218, 203, 159), GMM samples match reconstructions at $\beta{=}1$ and $0.1$, so there the decoder rather than the sampler limits quality; they trail only at $\beta{=}0.01$ (159 vs.\ 134), where 10 components may not fit the 128-d latents fully. IS of prior samples falls (1.91, 1.84, 1.70) even as FID holds or improves; since ImageNet classes separate these images poorly, we treat IS as uninformative.
+
+\textbf{Augmentation ablation} ($\beta{=}0.01$, rotation $\pm5^\circ$, translation 5\%). FID prior/GMM/recon.\ rises from 185/158/134 to 323/214/206, although validation loss (BCE${}+\beta$KL) is equal (2542). Prior samples of the augmented model have dark borders (mean brightness of the outer 4 pixels: 0.34, vs.\ 0.54 for test images and 0.52 without augmentation), consistent with the decoder learning the black fill of rotated training images. The augmented model's training loss is also 118 nats below validation (2 without), as expected if black corners are easy to reconstruct: augmentation added an artifact without improving generalization.
+
+\textbf{Qualitative.} Prior samples of the $\beta{=}0.01$ model (Fig.~\ref{fig:samples}, left) show chest outlines but are noisier than GMM samples (middle), which have clearer rib cages and lung fields. Reconstructions (right) keep global shape but lose fine rib detail; normal-to-pneumonia interpolation changes smoothly without ghosting. A PCA of test latents shows heavy NORMAL/PNEUMONIA overlap, so classes do not separate. \textbf{Limitations:} one seed per setting, untuned GMM size, no downstream validation.
+
+
+\clearpage
 \section*{AI usage statement}
 Claude Code (Anthropic) wrote the code and tests, ran training and evaluation on the author's laptop, checked the references, and drafted this report; a separate Claude review of the code and report led to two fixes. The author found the related paper, chose the setup, approved the design, plan and downloads, and reviewed the results. % TODO: edit to state exactly what you did and check it against the course's AI policy.
 
