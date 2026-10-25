@@ -45,7 +45,7 @@ InceptionV3 weights (about 104 MB) on first use.
 ## Figures, table and report
 
 ```bash
-uv run python -m vae_xray.plots --runs beta1 beta0.1 beta0.01 --best beta0.01
+uv run python -m vae_xray.plots --runs beta1_noaug beta0.1_noaug beta0.01_noaug --best beta0.01_noaug
 cd report && latexmk -pdf main.tex
 ```
 
